@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PATTERN RETRIEVAL — Remix</title>
+  <style>
+    body {
+      background-color: #05020a;
+      color: #c4b5fd;
+      font-family: 'Courier New', Courier, monospace;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 40px 0;
+    }
+    
+    .title-grid-container {
+      width: 90vw;
+      max-width: 500px;
+      aspect-ratio: 35 / 11;
+      display: grid;
+      gap: 2px;
+      margin: 0 auto 30px auto;
+      z-index: 20;
+    }
+    
+    .monitor {
+      position: relative;
+      width: 90vw;
+      max-width: 800px;
+      height: 60vh;
+      min-height: 350px;
+      background: #090514;
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 0 40px rgba(139, 92, 246, 0.1), inset 0 0 40px rgba(0,0,0,0.9);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-bottom: 30px;
+      border: 1px solid rgba(139, 92, 246, 0.2);
+      overflow: hidden;
+    }
+    
+    .crt-overlay {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        rgba(0, 0, 0, 0.15),
+        rgba(0, 0, 0, 0.15) 1px,
+        transparent 1px,
+        transparent 3px
+      );
+      pointer-events: none;
+      z-index: 10;
+      box-shadow: inset 0 0 100px rgba(0,0,0,0.9);
+    }
+    
+    .hud {
+      position: absolute;
+      color: rgba(139, 92, 246, 0.6);
+      font-size: 0.75rem;
+      letter-spacing: 2px;
+      z-index: 5;
+      font-weight: bold;
+      pointer-events: none;
+    }
+    .top-hud { top: 30px; left: 50%; transform: translateX(-50%); }
+    .bottom-hud { bottom: 30px; right: 40px; }
+    .left-hud { left: 30px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 60px; }
+    .right-hud { right: 30px; top: 35%; }
+    
+    .grid-container {
+      display: grid;
+      z-index: 2;
+      transition: gap 0.3s ease, width 0.3s ease, height 0.3s ease;
+    }
+    
+    .cell {
+      border: 1px solid rgba(139, 92, 246, 0.1);
+      transition: background 0.05s ease, border-color 0.05s ease, box-shadow 0.05s ease;
+      background: transparent;
+    }
+    
+    .cell.active {
+      border-color: #c4b5fd;
+      background: rgba(139, 92, 246, 0.25);
+      box-shadow: 0 0 8px #8b5cf6, inset 0 0 4px #8b5cf6;
+    }
+    
+    .controls {
+      display: flex;
+      gap: 10px;
+      width: 100%;
+      max-width: 600px;
+      z-index: 20;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      background: transparent;
+      border: 1px solid #4c1d95;
+      color: #c4b5fd;
+      padding: 12px 24px;
+      font-size: 1.2rem;
+      font-family: 'Courier New', Courier, monospace;
+      text-align: center;
+      outline: none;
+      box-shadow: 0 0 8px rgba(76, 29, 149, 0.5);
+      transition: all 0.2s ease;
+      text-transform: uppercase;
+    }
+    
+    input[type="text"]::placeholder {
+      color: rgba(196, 181, 253, 0.4);
+      text-transform: none;
+    }
+    
+    input[type="text"]:focus {
+      border-color: #8b5cf6;
+      box-shadow: 0 0 16px rgba(139, 92, 246, 0.6);
+    }
+
+    .upload-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(76, 29, 149, 0.2);
+      border: 1px solid #4c1d95;
+      color: #c4b5fd;
+      padding: 0 20px;
+      font-family: 'Courier New', Courier, monospace;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 0 8px rgba(76, 29, 149, 0.5);
+      transition: all 0.2s ease;
+    }
+    
+    .upload-btn:hover {
+      background: rgba(139, 92, 246, 0.3);
+      border-color: #8b5cf6;
+      box-shadow: 0 0 16px rgba(139, 92, 246, 0.6);
+    }
+    
+    /* Modes Additions */
+    .grid-container.ascii-mode .cell, .title-grid-container.ascii-mode .cell {
+       border: none !important;
+       background: transparent !important;
+       box-shadow: none !important;
+       display: flex;
+       align-items: center;
+       justify-content: center;
+       color: rgba(139, 92, 246, 0.15);
+    }
+    
+    .grid-container.ascii-mode .cell.active, .title-grid-container.ascii-mode .cell.active {
+       color: #c4b5fd;
+       text-shadow: 0 0 5px #8b5cf6, 0 0 10px #7c3aed;
+    }
+    
+    .grid-container.ascii-mode .cell::before, .title-grid-container.ascii-mode .cell::before {
+       content: attr(data-char);
+    }
+    
+    .cell.glitching {
+       pointer-events: none;
+       z-index: 10;
+       mix-blend-mode: screen;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="titleGrid" class="title-grid-container"></div>
+
+  <div class="monitor">
+    <div class="crt-overlay"></div>
+    <div class="hud top-hud">TRACKING - / // 0 PX</div>
+    <div class="hud left-hud">
+      <span>200</span>
+      <span>150</span>
+      <span>100</span>
+    </div>
+    <div class="hud right-hud">ARM</div>
+    <div class="hud bottom-hud">SYS SRCH // REC_ON</div>
+    
+    <div class="grid-container" id="grid"></div>
+  </div>
+  
+  <div class="controls">
+    <input type="text" id="inputBox" maxlength="14" placeholder="Type pattern..." autocomplete="off">
+    <button id="modeBtn" class="upload-btn" style="font-size: 1rem; appearance: none; margin: 0; outline: none; padding: 0 10px;">MODE: BLOCK</button>
+    <label for="imageUpload" class="upload-btn">IMG_UPLOAD</label>
+    <input type="file" id="imageUpload" accept="image/*" style="display: none;">
+    <button id="exportBtn" class="upload-btn" style="font-size: 1rem; appearance: none; margin: 0; outline: none;">EXPORT_PNG</button>
+  </div>
+
+  <script>
+    let COLS = 31;
+    let ROWS = 11;
+    let TOTAL_CELLS = COLS * ROWS;
+    const grid = document.getElementById('grid');
+    const inputBox = document.getElementById('inputBox');
+    
+    const asciiChars = ['0', '1', '*', '+', '#', '@', '&', '%', '$', 'X'];
+    let renderMode = 'BLOCK';
+    const modeBtn = document.getElementById('modeBtn');
+    if(modeBtn) {
+      modeBtn.addEventListener('click', () => {
+         if (renderMode === 'BLOCK') renderMode = 'ASCII';
+         else renderMode = 'BLOCK';
+         modeBtn.textContent = 'MODE: ' + renderMode;
+         
+         grid.className = 'grid-container';
+         document.getElementById('titleGrid').className = 'title-grid-container';
+         if (renderMode === 'ASCII') {
+            grid.classList.add('ascii-mode');
+            document.getElementById('titleGrid').classList.add('ascii-mode');
+         }
+      });
+    }
+
+    // Interactive Mouse Glitch
+    document.querySelector('.monitor').addEventListener('mousemove', (e) => {
+       if (state[0] === 'noise') return;
+       const rect = grid.getBoundingClientRect();
+       const x = e.clientX - rect.left;
+       const y = e.clientY - rect.top;
+       const cellW = rect.width / COLS;
+       const cellH = rect.height / ROWS;
+       
+       const col = Math.floor(x / cellW);
+       const row = Math.floor(y / cellH);
+       
+       // Restricted to exactly 2 rows and 2 columns
+       for (let r = 0; r <= 1; r++) {
+         for (let c = 0; c <= 1; c++) {
+           if (Math.random() > 0.6) continue;
+           let nr = row + r;
+           let nc = col + c;
+           if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS) {
+             let idx = nr * COLS + nc;
+             let cell = cells[idx];
+             if (cell && !cell.classList.contains('glitching')) {
+               cell.classList.add('glitching');
+               cell.classList.toggle('active', Math.random() > 0.5);
+               cell.style.transform = `translate(${(Math.random()-0.5)*15}px, ${(Math.random()-0.5)*15}px)`;
+               
+               setTimeout(() => {
+                  cell.classList.remove('glitching');
+                  cell.classList.toggle('active', targetPattern[idx] === 1);
+                  cell.style.transform = 'none';
+               }, 100 + Math.random() * 300);
+             }
+           }
+         }
+       }
+    });
+    
+    // 3x5 Pixel Font Dictionary
+    const font = {
+      'A': [0,1,0, 1,0,1, 1,1,1, 1,0,1, 1,0,1],
+      'B': [1,1,0, 1,0,1, 1,1,0, 1,0,1, 1,1,0],
+      'C': [0,1,1, 1,0,0, 1,0,0, 1,0,0, 0,1,1],
+      'D': [1,1,0, 1,0,1, 1,0,1, 1,0,1, 1,1,0],
+      'E': [1,1,1, 1,0,0, 1,1,0, 1,0,0, 1,1,1],
+      'F': [1,1,1, 1,0,0, 1,1,0, 1,0,0, 1,0,0],
+      'G': [0,1,1, 1,0,0, 1,0,1, 1,0,1, 0,1,1],
+      'H': [1,0,1, 1,0,1, 1,1,1, 1,0,1, 1,0,1],
+      'I': [1,1,1, 0,1,0, 0,1,0, 0,1,0, 1,1,1],
+      'J': [0,0,1, 0,0,1, 0,0,1, 1,0,1, 0,1,0],
+      'K': [1,0,1, 1,1,0, 1,0,0, 1,1,0, 1,0,1],
+      'L': [1,0,0, 1,0,0, 1,0,0, 1,0,0, 1,1,1],
+      'M': [1,0,1, 1,1,1, 1,0,1, 1,0,1, 1,0,1],
+      'N': [1,0,0, 1,1,0, 1,0,1, 0,1,1, 0,0,1],
+      'O': [0,1,0, 1,0,1, 1,0,1, 1,0,1, 0,1,0],
+      'P': [1,1,0, 1,0,1, 1,1,0, 1,0,0, 1,0,0],
+      'Q': [0,1,0, 1,0,1, 1,0,1, 0,1,1, 0,0,1],
+      'R': [1,1,0, 1,0,1, 1,1,0, 1,0,1, 1,0,1],
+      'S': [0,1,1, 1,0,0, 0,1,0, 0,0,1, 1,1,0],
+      'T': [1,1,1, 0,1,0, 0,1,0, 0,1,0, 0,1,0],
+      'U': [1,0,1, 1,0,1, 1,0,1, 1,0,1, 0,1,1],
+      'V': [1,0,1, 1,0,1, 1,0,1, 1,0,1, 0,1,0],
+      'W': [1,0,1, 1,0,1, 1,0,1, 1,1,1, 0,1,0],
+      'X': [1,0,1, 1,0,1, 0,1,0, 1,0,1, 1,0,1],
+      'Y': [1,0,1, 1,0,1, 0,1,0, 0,1,0, 0,1,0],
+      'Z': [1,1,1, 0,0,1, 0,1,0, 1,0,0, 1,1,1],
+      '0': [0,1,0, 1,0,1, 1,0,1, 1,0,1, 0,1,0],
+      '1': [0,1,0, 1,1,0, 0,1,0, 0,1,0, 1,1,1],
+      '2': [0,1,1, 1,0,1, 0,1,0, 1,0,0, 1,1,1],
+      '3': [1,1,1, 0,0,1, 0,1,1, 0,0,1, 1,1,0],
+      '4': [1,0,1, 1,0,1, 1,1,1, 0,0,1, 0,0,1],
+      '5': [1,1,1, 1,0,0, 1,1,0, 0,0,1, 1,1,0],
+      '6': [0,1,1, 1,0,0, 1,1,0, 1,0,1, 0,1,0],
+      '7': [1,1,1, 0,0,1, 0,1,0, 0,1,0, 0,1,0],
+      '8': [0,1,0, 1,0,1, 0,1,0, 1,0,1, 0,1,0],
+      '9': [0,1,0, 1,0,1, 0,1,1, 0,0,1, 1,1,0],
+      ' ': [0,0,0, 0,0,0, 0,0,0, 0,0,0, 0,0,0],
+      '?': [0,1,1, 1,0,1, 0,1,0, 0,0,0, 0,1,0]
+    };
+
+    // --- Static Title Grid Generation ---
+    function createStaticTitle() {
+      const container = document.getElementById('titleGrid');
+      const cols = 35; // 9 chars max length (RETRIEVAL)
+      const rows = 11;
+      container.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+      container.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+      
+      let titlePattern = new Array(cols * rows).fill(0);
+      
+      function drawTitleLine(str, startRow) {
+        let width = str.length * 4 - 1;
+        let startCol = Math.floor((cols - width) / 2);
+        for (let i = 0; i < str.length; i++) {
+          let char = str[i];
+          let pattern = font[char] || font['?'];
+          for (let r = 0; r < 5; r++) {
+            for (let c = 0; c < 3; c++) {
+              if (pattern[r * 3 + c]) {
+                 titlePattern[(startRow + r) * cols + (startCol + i * 4 + c)] = 1;
+              }
+            }
+          }
+        }
+      }
+
+      drawTitleLine("PATTERN", 0);
+      drawTitleLine("RETRIEVAL", 6);
+      
+      const asciiChars = ['0', '1', '*', '+', '#', '@', '&', '%', '$', 'X'];
+      for(let i = 0; i < cols * rows; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.setAttribute('data-char', asciiChars[i % asciiChars.length]);
+        if(titlePattern[i]) {
+          cell.classList.add('active');
+        } else {
+          cell.style.borderColor = "transparent";
+        }
+        container.appendChild(cell);
+      }
+    }
+    
+    createStaticTitle();
+
+    // --- Main Monitor Grid Logic ---
+    let cells = [];
+    let targetPattern = [];
+    let state = [];
+    let noiseInterval;
+    let revealTimer;
+    let debounceTimer;
+    let phase1Timeout;
+    
+    function updateGridSize() {
+      const monitor = document.querySelector('.monitor');
+      const mw = monitor.clientWidth * 0.85;
+      const mh = monitor.clientHeight * 0.85;
+      const monitorAspect = mw / mh;
+      const gridAspect = COLS / ROWS;
+      
+      let cellW;
+      if (gridAspect > monitorAspect) {
+        grid.style.width = mw + 'px';
+        grid.style.height = (mw / gridAspect) + 'px';
+        cellW = mw / COLS;
+      } else {
+        grid.style.height = mh + 'px';
+        grid.style.width = (mh * gridAspect) + 'px';
+        cellW = (mh * gridAspect) / COLS;
+      }
+      grid.style.fontSize = Math.max(4, cellW * 0.8) + 'px';
+      
+      const titleContainer = document.getElementById('titleGrid');
+      let titleCellW = titleContainer.clientWidth / 35;
+      titleContainer.style.fontSize = Math.max(8, titleCellW * 0.8) + 'px';
+    }
+
+    window.addEventListener('resize', updateGridSize);
+
+    function rebuildGrid(c, r) {
+      COLS = c;
+      ROWS = r;
+      TOTAL_CELLS = c * r;
+      grid.innerHTML = '';
+      grid.style.gridTemplateColumns = `repeat(${c}, 1fr)`;
+      grid.style.gridTemplateRows = `repeat(${r}, 1fr)`;
+      
+      // Remove gap entirely on extreme high-res to make the pixels merge perfectly
+      grid.style.gap = c > 100 ? '0px' : (c > 50 ? '1px' : '2px');
+      
+      cells = [];
+      targetPattern = new Array(TOTAL_CELLS).fill(0);
+      state = new Array(TOTAL_CELLS).fill('noise');
+      
+      for(let i = 0; i < TOTAL_CELLS; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.setAttribute('data-char', asciiChars[i % asciiChars.length]);
+        grid.appendChild(cell);
+        cells.push(cell);
+      }
+      
+      updateGridSize();
+    }
+    
+    function calculatePattern(text) {
+      targetPattern.fill(0);
+      text = text.toUpperCase();
+      
+      let line1 = text;
+      let line2 = "";
+      
+      if (text.length > 7) {
+        let splitIdx = text.substring(0, 8).lastIndexOf(' ');
+        if (splitIdx > 0) {
+          line1 = text.substring(0, splitIdx);
+          line2 = text.substring(splitIdx + 1);
+        } else {
+          line1 = text.substring(0, 7);
+          line2 = text.substring(7);
+        }
+      }
+
+      function drawLine(str, startRow) {
+        let width = str.length * 4 - 1;
+        let startCol = Math.floor((COLS - width) / 2);
+        for (let i = 0; i < str.length; i++) {
+          let char = str[i];
+          let pattern = font[char] || font['?'];
+          for (let r = 0; r < 5; r++) {
+            for (let c = 0; c < 3; c++) {
+              if (pattern[r * 3 + c]) {
+                 let idx = (startRow + r) * COLS + (startCol + i * 4 + c);
+                 if (idx >= 0 && idx < TOTAL_CELLS) targetPattern[idx] = 1;
+              }
+            }
+          }
+        }
+      }
+
+      if (line2 === "") {
+        drawLine(line1, 3);
+      } else {
+        drawLine(line1, 0);
+        drawLine(line2, 6);
+      }
+    }
+    
+    function initDisplay(patternData) {
+      clearInterval(noiseInterval);
+      clearInterval(revealTimer);
+      clearTimeout(phase1Timeout);
+      state.fill('noise');
+      
+      if (typeof patternData === 'string') {
+        calculatePattern(patternData);
+      } else {
+        for (let i = 0; i < TOTAL_CELLS; i++) {
+          targetPattern[i] = patternData[i];
+        }
+      }
+      
+      // Phase 1: Pure static/noise
+      noiseInterval = setInterval(() => {
+        // Only update a batch of cells to prevent lag on extreme high-res
+        const batch = Math.min(TOTAL_CELLS, COLS > 50 ? 1500 : TOTAL_CELLS);
+        for(let k=0; k < batch; k++) {
+          let i = COLS > 50 ? Math.floor(Math.random() * TOTAL_CELLS) : k;
+          if (state[i] === 'noise') {
+            cells[i].classList.toggle('active', Math.random() > 0.85);
+          }
+        }
+      }, 50);
+      
+      // Phase 2: Recall & Reconstruction
+      phase1Timeout = setTimeout(() => {
+        let indices = Array.from({length: TOTAL_CELLS}, (_, i) => i);
+        for (let i = indices.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [indices[i], indices[j]] = [indices[j], indices[i]];
+        }
+        
+        let batchSize = COLS > 50 ? Math.floor(TOTAL_CELLS / 40) : 5; // Finish in ~1.2s
+        revealTimer = setInterval(() => {
+          for(let i = 0; i < batchSize; i++) {
+            if(indices.length === 0) {
+              clearInterval(revealTimer);
+              clearInterval(noiseInterval);
+              return;
+            }
+            let idx = indices.pop();
+            state[idx] = 'revealed';
+            cells[idx].classList.toggle('active', targetPattern[idx] === 1);
+          }
+        }, 30);
+      }, 600);
+    }
+
+    inputBox.addEventListener('input', (e) => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        let text = e.target.value.trim();
+        if (text.length === 0) text = "?";
+        
+        // Reset to original resolution if returning to text
+        if (COLS !== 31) rebuildGrid(31, 11);
+        
+        initDisplay(text);
+      }, 200);
+    });
+
+    // --- Image Processing Logic ---
+    const imageUpload = document.getElementById('imageUpload');
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    
+    imageUpload.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          
+          // Dynamically calculate grid dimensions based on exact image aspect ratio
+          // We target roughly 12,000 cells for maximum accuracy without crashing the browser
+          const aspect = img.width / img.height;
+          const targetCells = 12000;
+          let r = Math.round(Math.sqrt(targetCells / aspect));
+          let c = Math.round(r * aspect);
+          
+          // Cap maximums to prevent extreme edge cases
+          if (c > 220) { c = 220; r = Math.round(220 / aspect); }
+          if (r > 220) { r = 220; c = Math.round(220 * aspect); }
+          
+          rebuildGrid(c, r);
+          
+          canvas.width = COLS;
+          canvas.height = ROWS;
+          
+          // Detect white background
+          const tempCanvas = document.createElement('canvas');
+          tempCanvas.width = 1; tempCanvas.height = 1;
+          const tCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
+          tCtx.drawImage(img, 0, 0, 1, 1);
+          const tData = tCtx.getImageData(0, 0, 1, 1).data;
+          const isWhiteBg = (tData[3] > 200 && (tData[0]+tData[1]+tData[2])/3 > 220);
+          
+          ctx.fillStyle = isWhiteBg ? 'white' : 'black';
+          ctx.fillRect(0, 0, COLS, ROWS);
+          
+          // Because grid now perfectly matches image aspect ratio, we can draw it directly
+          ctx.drawImage(img, 0, 0, COLS, ROWS);
+          
+          const imageData = ctx.getImageData(0, 0, COLS, ROWS).data;
+          const newPattern = new Array(TOTAL_CELLS).fill(0);
+          
+          // Threshold logic with random dithering for better gradients
+          for (let i = 0; i < TOTAL_CELLS; i++) {
+            const red = imageData[i * 4];
+            const green = imageData[i * 4 + 1];
+            const blue = imageData[i * 4 + 2];
+            const a = imageData[i * 4 + 3];
+            
+            const brightness = 0.299 * red + 0.587 * green + 0.114 * blue;
+            
+            if (isWhiteBg) {
+               // Invert for white backgrounds
+               if (brightness < 160) newPattern[i] = 1;
+            } else {
+               // Add a tiny bit of random dithering to smooth out harsh gradient edges
+               const dither = Math.random() * 40 - 20; 
+               if ((brightness + dither) > 100 && a > 50) newPattern[i] = 1;
+            }
+          }
+          
+          initDisplay(newPattern);
+        };
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // --- Export Logic ---
+    document.getElementById('exportBtn').addEventListener('click', () => {
+      const expCanvas = document.createElement('canvas');
+      
+      const targetWidth = 2000;
+      const cellSize = Math.max(2, Math.floor(targetWidth / COLS)); 
+      const padding = cellSize * 4;
+      const canvasWidth = COLS * cellSize + padding * 2;
+      
+      // Calculate title space
+      const titleCellSize = Math.floor(canvasWidth / 60); 
+      const titleHeight = titleCellSize * 15;
+      const gridOffsetY = titleHeight;
+      const monitorHeight = ROWS * cellSize + padding * 2;
+      const canvasHeight = gridOffsetY + monitorHeight;
+      const monitorCenterY = gridOffsetY + monitorHeight / 2;
+      
+      expCanvas.width = canvasWidth;
+      expCanvas.height = canvasHeight;
+      const eCtx = expCanvas.getContext('2d');
+      
+      // Helper drawing functions
+      function drawShape(ctx, x, y, size, idx) {
+         ctx.rect(x, y, size, size);
+      }
+      
+      function drawText(ctx, x, y, size, idx) {
+         let char = asciiChars[idx % asciiChars.length];
+         ctx.fillText(char, x + size/2, y + size/2 + size*0.1);
+      }
+
+      // 1. Offscreen Canvases for Glow Masking
+      const titleOff = document.createElement('canvas');
+      titleOff.width = canvasWidth; titleOff.height = canvasHeight;
+      const tCtx = titleOff.getContext('2d');
+      
+      const gridOff = document.createElement('canvas');
+      gridOff.width = canvasWidth; gridOff.height = canvasHeight;
+      const gCtx = gridOff.getContext('2d');
+      
+      // Backgrounds
+      eCtx.fillStyle = '#05020a';
+      eCtx.fillRect(0, 0, canvasWidth, canvasHeight);
+      eCtx.fillStyle = '#090514';
+      eCtx.fillRect(0, gridOffsetY, canvasWidth, monitorHeight);
+      
+      // Draw Title Mask
+      if (renderMode === 'ASCII') {
+         tCtx.font = `bold ${titleCellSize}px 'Courier New', Courier, monospace`;
+         tCtx.textAlign = 'center';
+         tCtx.textBaseline = 'middle';
+         tCtx.fillStyle = '#ffffff';
+      } else {
+         tCtx.strokeStyle = '#ffffff';
+         tCtx.lineWidth = Math.max(2, titleCellSize * 0.08);
+         tCtx.beginPath();
+      }
+      
+      function drawTitleMask(ctx, doFill) {
+           let tIdx = 0;
+           for (let str of [ ["PATTERN", 4, 0], ["RETRIEVAL", 0, 6] ]) {
+             let text = str[0]; let startCol = str[1]; let startRow = str[2];
+             for (let i = 0; i < text.length; i++) {
+               let char = text[i];
+               let pattern = font[char] || font['?'];
+               for (let r = 0; r < 5; r++) {
+                 for (let c = 0; c < 3; c++) {
+                   tIdx++;
+                   if (pattern[r * 3 + c]) {
+                      let x = (startCol + i * 4 + c) * titleCellSize + (canvasWidth - 35 * titleCellSize) / 2;
+                      let y = (startRow + r) * titleCellSize + titleCellSize * 3;
+                      let gap = Math.max(2, titleCellSize * 0.1);
+                      let size = titleCellSize - gap;
+                      if (renderMode === 'ASCII') {
+                         drawText(ctx, x, y, size, tIdx);
+                      } else {
+                         drawShape(ctx, x, y, size, tIdx);
+                      }
+                   }
+                 }
+               }
+             }
+           }
+      }
+      drawTitleMask(tCtx, false);
+      if (renderMode !== 'ASCII') tCtx.stroke();
+      
+      // Draw Grid Mask
+      if (renderMode === 'ASCII') {
+         gCtx.font = `bold ${cellSize}px 'Courier New', Courier, monospace`;
+         gCtx.textAlign = 'center';
+         gCtx.textBaseline = 'middle';
+         gCtx.fillStyle = '#ffffff';
+      } else {
+         gCtx.strokeStyle = '#ffffff';
+         gCtx.lineWidth = Math.max(1, cellSize * 0.08);
+         gCtx.beginPath();
+      }
+      for(let r=0; r<ROWS; r++) {
+        for(let c=0; c<COLS; c++) {
+          let idx = r * COLS + c;
+          if (cells[idx] && cells[idx].classList.contains('active')) {
+             let x = padding + c * cellSize;
+             let y = gridOffsetY + padding + r * cellSize;
+             let gap = grid.style.gap === '0px' ? 0 : Math.max(1, cellSize * 0.05);
+             let size = cellSize - gap;
+             if (renderMode === 'ASCII') drawText(gCtx, x, y, size, idx);
+             else drawShape(gCtx, x, y, size, idx);
+          }
+        }
+      }
+      if (renderMode !== 'ASCII') gCtx.stroke();
+      
+      // 2. Stamp glows onto main canvas (bitmap blurring = extremely fast)
+      function applyGlow(canvas, blur, color) {
+         eCtx.shadowBlur = blur;
+         eCtx.shadowColor = color;
+         eCtx.drawImage(canvas, 0, 0);
+      }
+      applyGlow(titleOff, titleCellSize * 3, '#6d28d9');
+      applyGlow(titleOff, titleCellSize * 1.5, '#7c3aed');
+      applyGlow(titleOff, titleCellSize * 0.5, '#8b5cf6');
+      
+      applyGlow(gridOff, cellSize * 3, '#6d28d9');
+      applyGlow(gridOff, cellSize * 1.5, '#7c3aed');
+      applyGlow(gridOff, cellSize * 0.5, '#8b5cf6');
+      
+      // Remove shadow for all subsequent drawing
+      eCtx.shadowBlur = 0;
+      
+      // 3. Draw final crisp layers (NO SHADOWS)
+      // Empty cells
+      if (renderMode === 'ASCII') {
+          eCtx.font = `bold ${cellSize}px 'Courier New', Courier, monospace`;
+          eCtx.textAlign = 'center';
+          eCtx.textBaseline = 'middle';
+          eCtx.fillStyle = 'rgba(139, 92, 246, 0.15)';
+      } else {
+          eCtx.strokeStyle = 'rgba(139, 92, 246, 0.15)';
+          eCtx.lineWidth = Math.max(1, cellSize * 0.05);
+          eCtx.beginPath();
+      }
+      for(let r=0; r<ROWS; r++) {
+        for(let c=0; c<COLS; c++) {
+          let idx = r * COLS + c;
+          if (!cells[idx] || !cells[idx].classList.contains('active')) {
+             let x = padding + c * cellSize;
+             let y = gridOffsetY + padding + r * cellSize;
+             let gap = grid.style.gap === '0px' ? 0 : Math.max(1, cellSize * 0.05);
+             let size = cellSize - gap;
+             if (renderMode === 'ASCII') drawText(eCtx, x, y, size, idx);
+             else drawShape(eCtx, x, y, size, idx);
+          }
+        }
+      }
+      if (renderMode !== 'ASCII') eCtx.stroke();
+      
+      // Crisp Title Tops
+      if (renderMode === 'ASCII') {
+          eCtx.font = `bold ${titleCellSize}px 'Courier New', Courier, monospace`;
+          eCtx.textAlign = 'center';
+          eCtx.textBaseline = 'middle';
+          eCtx.fillStyle = '#c4b5fd';
+      } else {
+          eCtx.strokeStyle = '#c4b5fd';
+          eCtx.fillStyle = 'rgba(139, 92, 246, 0.25)';
+          eCtx.lineWidth = Math.max(2, titleCellSize * 0.08);
+          eCtx.beginPath();
+      }
+      drawTitleMask(eCtx, true);
+      if (renderMode !== 'ASCII') { eCtx.fill(); eCtx.stroke(); }
+      
+      // Crisp Grid Tops
+      if (renderMode === 'ASCII') {
+          eCtx.font = `bold ${cellSize}px 'Courier New', Courier, monospace`;
+          eCtx.textAlign = 'center';
+          eCtx.textBaseline = 'middle';
+          eCtx.fillStyle = '#c4b5fd';
+      } else {
+          eCtx.strokeStyle = '#c4b5fd';
+          eCtx.fillStyle = 'rgba(139, 92, 246, 0.25)';
+          eCtx.lineWidth = Math.max(1, cellSize * 0.08);
+          eCtx.beginPath();
+      }
+      for(let r=0; r<ROWS; r++) {
+        for(let c=0; c<COLS; c++) {
+          let idx = r * COLS + c;
+          if (cells[idx] && cells[idx].classList.contains('active')) {
+             let x = padding + c * cellSize;
+             let y = gridOffsetY + padding + r * cellSize;
+             let gap = grid.style.gap === '0px' ? 0 : Math.max(1, cellSize * 0.05);
+             let size = cellSize - gap;
+             
+             if (renderMode === 'ASCII') {
+                drawText(eCtx, x, y, size, idx);
+             } else {
+                drawShape(eCtx, x, y, size, idx);
+             }
+          }
+        }
+      }
+      if (renderMode !== 'ASCII') { eCtx.fill(); eCtx.stroke(); }
+      
+      // Draw HUD elements
+      eCtx.shadowBlur = 0;
+      eCtx.fillStyle = 'rgba(139, 92, 246, 0.6)';
+      eCtx.font = `bold ${Math.floor(cellSize * 1.2)}px 'Courier New', Courier, monospace`;
+      
+      eCtx.textAlign = 'center';
+      eCtx.fillText('TRACKING - / // 0 PX', canvasWidth / 2, gridOffsetY + padding / 2);
+      
+      eCtx.textAlign = 'right';
+      eCtx.fillText('SYS SRCH // REC_ON', canvasWidth - padding, canvasHeight - padding / 2);
+      eCtx.fillText('ARM', canvasWidth - padding / 2, monitorCenterY);
+      
+      eCtx.textAlign = 'left';
+      eCtx.fillText('200', padding / 2, monitorCenterY - cellSize * 5);
+      eCtx.fillText('150', padding / 2, monitorCenterY);
+      eCtx.fillText('100', padding / 2, monitorCenterY + cellSize * 5);
+
+      // Add CRT Scanlines
+      eCtx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+      for(let y = gridOffsetY; y < canvasHeight; y += 4) {
+         eCtx.fillRect(0, y, canvasWidth, 2);
+      }
+      
+      // Vignette
+      let grad = eCtx.createRadialGradient(canvasWidth/2, monitorCenterY, monitorHeight/3, canvasWidth/2, monitorCenterY, canvasWidth/1.5);
+      grad.addColorStop(0, 'rgba(0,0,0,0)');
+      grad.addColorStop(1, 'rgba(0,0,0,0.8)');
+      eCtx.fillStyle = grad;
+      eCtx.fillRect(0, gridOffsetY, canvasWidth, monitorHeight);
+      
+      // Add Watermark perfectly in the corner
+      eCtx.shadowBlur = 10;
+      eCtx.shadowColor = '#8b5cf6';
+      eCtx.fillStyle = '#c4b5fd';
+      eCtx.font = `bold ${Math.floor(cellSize * 1.5)}px 'Courier New', Courier, monospace`;
+      eCtx.textAlign = 'right';
+      eCtx.fillText('made by palak', canvasWidth - padding, canvasHeight - padding / 4);
+      
+      // Trigger Download
+      // Adding a tiny setTimeout so the browser UI has a moment to catch its breath if needed
+      setTimeout(() => {
+        const link = document.createElement('a');
+        link.download = 'PATTERN_RETRIEVAL_PALAK.png';
+        link.href = expCanvas.toDataURL('image/png');
+        link.click();
+      }, 50);
+    });
+
+    // Boot up
+    rebuildGrid(31, 11);
+    initDisplay("?");
+  </script>
+</body>
+</html>
