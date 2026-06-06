@@ -95,8 +95,10 @@
     
     .controls {
       display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
       gap: 10px;
-      width: 100%;
+      width: 90vw;
       max-width: 600px;
       z-index: 20;
     }
@@ -145,6 +147,15 @@
       background: rgba(139, 92, 246, 0.3);
       border-color: #8b5cf6;
       box-shadow: 0 0 16px rgba(139, 92, 246, 0.6);
+    }
+    
+    @media (max-width: 600px) {
+      .hud { font-size: 0.6rem; letter-spacing: 1px; }
+      .left-hud { gap: 30px; }
+      .monitor { min-height: 250px; height: 40vh; padding: 10px; border-radius: 12px; }
+      input[type="text"] { flex: 1 1 100%; padding: 10px; font-size: 1rem; }
+      .upload-btn { flex: 1 1 auto; font-size: 0.8rem !important; padding: 10px 5px !important; text-align: center; }
+      body { padding: 20px 0; }
     }
     
     /* Modes Additions */
